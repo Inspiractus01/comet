@@ -1,15 +1,23 @@
 // Free, keyless text generation via Pollinations (OpenAI-compatible endpoint).
 const ENDPOINT = 'https://text.pollinations.ai/openai';
 
-const SYSTEM_PROMPT = `You write git commit messages. Follow Conventional Commits.
+function buildSystemPrompt({ conventional, short }) {
+    const subject = conventional
+        ? 'Subject line: "type(scope): summary" (type one of feat, fix, refactor, style, docs, test, chore, perf, build, ci; scope optional, derived from changed files), lowercase, imperative mood, max 72 chars.'
+        : 'Subject line: one concise summary in imperative mood, max 72 chars.';
+
+    const body = short
+        ? '- Output ONLY the subject line. No body, no bullets.'
+        : '- If the change is non-trivial, add a blank line then 1-4 short "- " bullet points describing what changed and why.';
+
+    return `You write git commit messages.
 
 Rules:
 - Output ONLY the commit message. No code fences, no quotes, no explanations.
-- Subject line: "type(scope): summary", lowercase, max 72 chars, imperative mood.
-- type is one of: feat, fix, refactor, style, docs, test, chore, perf, build, ci.
-- scope is optional, derive it from the changed files when obvious.
-- If the change is non-trivial, add a blank line then 1-4 short "- " bullet points describing what changed and why.
-- Keep it concise and specific to the diff. Do not invent changes.`;
+- ${subject}
+${body}
+- Keep it specific to the diff. Do not invent changes.`;
+}
 
 // Lockfiles / generated noise we strip before sending the diff to the model.
 const NOISE = [
@@ -46,7 +54,10 @@ function clean(message) {
         .trim();
 }
 
-export async function generateCommit(diff, { model = 'openai' } = {}) {
+export async function generateCommit(
+    diff,
+    { model = 'openai', conventional = true, short = false } = {},
+) {
     const res = await fetch(ENDPOINT, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -54,7 +65,10 @@ export async function generateCommit(diff, { model = 'openai' } = {}) {
             model,
             private: true,
             messages: [
-                { role: 'system', content: SYSTEM_PROMPT },
+                {
+                    role: 'system',
+                    content: buildSystemPrompt({ conventional, short }),
+                },
                 {
                     role: 'user',
                     content: `Generate a commit message for this staged diff:\n\n${trimDiff(diff)}`,

@@ -7,6 +7,7 @@ import {
     select,
 } from '@inquirer/prompts';
 import { generateCommit } from './ai.js';
+import { defaults, loadConfig, saveConfig } from './config.js';
 import {
     changedFiles,
     commit,
@@ -16,8 +17,14 @@ import {
     stagedDiff,
     stagedFileNames,
     stageOnly,
+    unstage,
 } from './git.js';
 import { selfUpdate } from './update.js';
+
+let cfg = loadConfig();
+
+const IGNORED = new Set(['CLAUDE.md']);
+const isIgnored = (p) => cfg.ignoreClaudeMd && IGNORED.has(p.split('/').pop());
 
 const O = '\x1b[38;5;208m'; // orange
 const A = '\x1b[38;5;214m'; // amber
@@ -71,7 +78,10 @@ async function generate() {
     }
     process.stdout.write(c.dim('  generating message…'));
     try {
-        const msg = await generateCommit(diff);
+        const msg = await generateCommit(diff, {
+            conventional: cfg.conventionalCommits,
+            short: cfg.short,
+        });
         process.stdout.write('\r\x1b[K');
         return msg;
     } catch (err) {
@@ -126,15 +136,47 @@ async function confirmAndCommit(initialMessage) {
         commit(message);
         console.log(c.orange('☄ committed'));
 
-        if (await confirm({ message: 'Push?', default: false, theme })) {
+        if (
+            cfg.askForPush &&
+            (await confirm({ message: 'Push?', default: false, theme }))
+        ) {
             push();
         }
         return;
     }
 }
 
+async function runConfig() {
+    const items = [
+        { key: 'ignoreClaudeMd', name: 'Ignore CLAUDE.md when staging' },
+        { key: 'askForPush', name: 'Ask to push after commit' },
+        { key: 'conventionalCommits', name: 'Conventional Commits style' },
+        { key: 'short', name: 'Short messages (subject line only)' },
+    ];
+
+    const enabled = await checkbox({
+        message: 'Settings — space to toggle, enter to save',
+        choices: items.map((i) => ({
+            name: i.name,
+            value: i.key,
+            checked: cfg[i.key],
+        })),
+        loop: false,
+        theme,
+    });
+
+    const next = { ...defaults };
+    for (const i of items) {
+        next[i.key] = enabled.includes(i.key);
+    }
+    saveConfig(next);
+    cfg = next;
+    console.log(c.orange('☄ settings saved'));
+}
+
 async function yolo() {
     stageAll();
+    unstage(stagedFileNames().filter(isIgnored));
     if (stagedFileNames().length === 0) {
         bail('Nothing to commit.');
     }
@@ -142,7 +184,7 @@ async function yolo() {
 }
 
 async function interactive() {
-    const files = changedFiles();
+    const files = changedFiles().filter((f) => !isIgnored(f.path));
     if (files.length === 0) {
         bail('Working tree clean — nothing to commit.');
     }
@@ -171,18 +213,23 @@ async function main() {
     banner();
     enableEscapeToQuit();
 
+    const cmd = process.argv[2];
+
+    if (cmd === 'config') {
+        await runConfig();
+        return;
+    }
+
     if (!isRepo()) {
         bail('Not a git repository.');
     }
-
-    const cmd = process.argv[2];
 
     if (cmd === 'yolo') {
         await yolo();
     } else if (!cmd) {
         await interactive();
     } else {
-        console.log('Usage: comet [yolo]');
+        console.log('Usage: comet [yolo|config]');
         process.exit(1);
     }
 }

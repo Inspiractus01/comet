@@ -56,6 +56,12 @@ export function stageAll() {
     git(['add', '-A']);
 }
 
+export function unstage(paths) {
+    if (paths.length > 0) {
+        git(['restore', '--staged', '--', ...paths]);
+    }
+}
+
 export function stagedDiff() {
     return git(['diff', '--cached', '--no-color']);
 }
