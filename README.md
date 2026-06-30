@@ -4,9 +4,17 @@
 
 # comet ☄️
 
-Write git commit messages with AI. Free, no API key.
+> *every commit at the speed of a comet*
 
-You pick the files, comet writes the message.
+A small CLI that writes your git commit messages. Free, no API key.
+
+You stage the files, comet reads the diff and proposes a message. You commit.
+
+## How it works
+
+1. Reads your staged changes (`git diff --cached`).
+2. Sends the diff to a free model ([Pollinations](https://pollinations.ai), no key needed).
+3. Gives you a [Conventional Commits](https://www.conventionalcommits.org) message to commit, edit, or regenerate.
 
 ## Install
 
@@ -14,32 +22,29 @@ You pick the files, comet writes the message.
 curl -fsSL https://raw.githubusercontent.com/Inspiractus01/comet/main/install.sh | bash
 ```
 
-Needs `node` and `git`. If `comet` isn't found after install, add `~/.local/bin` to your PATH.
+Needs `node` (≥18) and `git`. If `comet` isn't found afterwards, add `~/.local/bin` to your `PATH`.
 
-## Use
-
-```bash
-comet        # pick files, get a message, commit
-comet yolo   # stage everything and commit
-```
-
-You can commit, regenerate, edit, or cancel the message before it's saved. Press `Esc` (or Ctrl-C) any time to quit.
-
-## Settings
+## Commands
 
 ```bash
-comet config
+comet         # pick files, review the message, commit
+comet yolo    # stage everything and commit
+comet push    # git push
+comet config  # settings
 ```
 
-Toggle with space, save with enter:
+`Esc` or `Ctrl-C` quits anytime.
 
-- **Ignore CLAUDE.md** — skip `CLAUDE.md` when staging (on by default)
-- **Ask to push** — ask to push after commit (off by default → manual push)
-- **Conventional Commits** — `type(scope): summary` style (on by default)
-- **Short messages** — subject line only, no body bullets (off by default)
+## Settings (`comet config`)
+
+| Setting | Default | Does |
+|---|---|---|
+| Ignore CLAUDE.md | on | skips `CLAUDE.md` when staging |
+| Ask to push | off | asks to push after commit |
+| Conventional Commits | on | `type(scope): summary` style |
+| Short messages | off | subject line only, no bullets |
 
 ## Notes
 
-- AI runs through [Pollinations](https://pollinations.ai) — free, no key.
-- Updates itself on every run.
-- `COMET_NO_UPDATE=1` turns auto-update off.
+- Updates itself on every run. Disable with `COMET_NO_UPDATE=1`.
+- The free model is rate-limited per IP; comet retries on 429.
