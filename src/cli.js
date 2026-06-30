@@ -47,8 +47,7 @@ const theme = {
 
 function banner() {
     console.log(`${O}\x1b[1m
-   ☄   c o m e t${R}${O}
-        ai commit messages${R}
+   ☄   c o m e t${R}
 `);
 }
 
