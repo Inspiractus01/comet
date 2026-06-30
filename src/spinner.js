@@ -40,13 +40,11 @@ function pick(words) {
     return words[Math.floor(Math.random() * words.length)];
 }
 
-function comet(pos, width, tail, head) {
-    const cells = Array(width).fill(' ');
-    for (let t = 0; t < tail.length; t++) {
-        const p = pos - (t + 1);
-        if (p >= 0 && p < width) {
-            cells[p] = `${DIM}${A}${tail[t]}${R}`;
-        }
+function cometDots(pos, width, head) {
+    const cells = Array(width).fill(`${DIM}.${R}`);
+    const behind = pos - 1;
+    if (behind >= 0 && behind < width) {
+        cells[behind] = `${A}.${R}`;
     }
     if (pos >= 0 && pos < width) {
         cells[pos] = `${O}\x1b[1m${head}${R}`;
@@ -56,10 +54,9 @@ function comet(pos, width, tail, head) {
 
 export function startSpinner({
     words,
-    tail = ['.', '.', '.'],
     head = '*',
-    width = 16,
-    interval = 110,
+    width = 5,
+    interval = 130,
 } = {}) {
     if (!process.stdout.isTTY) {
         return () => {};
@@ -67,19 +64,13 @@ export function startSpinner({
 
     const word = pick(words);
     let pos = 0;
-    let tick = 0;
     process.stdout.write('\x1b[?25l');
 
     const id = setInterval(() => {
-        const cols = process.stdout.columns || 80;
-        const dots = '.'.repeat(tick % 4).padEnd(3);
-        const left = `  ${O}${word}${R}${DIM}${dots}${R}`;
-        const leftLen = 2 + word.length + 3;
-        const anim = comet(pos, width, tail, head);
-        const pad = Math.max(2, cols - leftLen - width - 1);
-        process.stdout.write(`\r\x1b[K${left}${' '.repeat(pad)}${anim}`);
-        pos = (pos + 1) % (width + tail.length);
-        tick++;
+        process.stdout.write(
+            `\r\x1b[K  ${O}${word}${R}${cometDots(pos, width, head)}`,
+        );
+        pos = (pos + 1) % width;
     }, interval);
 
     return () => {

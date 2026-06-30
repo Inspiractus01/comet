@@ -72,9 +72,8 @@ function animatedPush() {
     return new Promise((resolve, reject) => {
         const stop = startSpinner({
             words: PUSH_WORDS,
-            tail: ['=', '=', '-'],
             head: '>',
-            interval: 80,
+            interval: 100,
         });
         let err = '';
         const p = spawn('git', ['push'], {
