@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawn } from 'node:child_process';
 import { emitKeypressEvents } from 'node:readline';
 import {
     checkbox,
@@ -12,13 +13,18 @@ import {
     changedFiles,
     commit,
     isRepo,
-    push,
     stageAll,
     stagedDiff,
     stagedFileNames,
     stageOnly,
     unstage,
 } from './git.js';
+import {
+    GENERATE_WORDS,
+    PUSH_WORDS,
+    startSpinner,
+    YOLO_WORDS,
+} from './spinner.js';
 import { selfUpdate } from './update.js';
 
 let cfg = loadConfig();
@@ -62,6 +68,35 @@ function bail(msg) {
     process.exit(1);
 }
 
+function animatedPush() {
+    return new Promise((resolve, reject) => {
+        const stop = startSpinner({
+            words: PUSH_WORDS,
+            tail: ['═', '═', '·'],
+            interval: 80,
+        });
+        let err = '';
+        const p = spawn('git', ['push'], {
+            stdio: ['ignore', 'ignore', 'pipe'],
+        });
+        p.stderr.on('data', (d) => {
+            err += d;
+        });
+        p.on('error', (e) => {
+            stop();
+            reject(e);
+        });
+        p.on('close', (code) => {
+            stop();
+            if (code === 0) {
+                resolve();
+            } else {
+                reject(new Error(err.trim() || 'push failed'));
+            }
+        });
+    });
+}
+
 // Quit on Escape (in addition to Ctrl-C), like cancelling the commit.
 function enableEscapeToQuit() {
     if (!process.stdin.isTTY) {
@@ -76,21 +111,21 @@ function enableEscapeToQuit() {
     });
 }
 
-async function generate() {
+async function generate(words = GENERATE_WORDS) {
     const diff = stagedDiff();
     if (!diff.trim()) {
         bail('Nothing staged.');
     }
-    process.stdout.write(c.dim('  generating message…'));
+    const stop = startSpinner({ words });
     try {
         const msg = await generateCommit(diff, {
             conventional: cfg.conventionalCommits,
             short: cfg.short,
         });
-        process.stdout.write('\r\x1b[K');
+        stop();
         return msg;
     } catch (err) {
-        process.stdout.write('\r\x1b[K');
+        stop();
         bail(`AI error: ${err.message}`);
     }
 }
@@ -145,7 +180,8 @@ async function confirmAndCommit(initialMessage) {
             cfg.askForPush &&
             (await confirm({ message: 'Push?', default: false, theme }))
         ) {
-            push();
+            await animatedPush();
+            console.log(c.orange('☄ pushed'));
         }
         return;
     }
@@ -189,7 +225,7 @@ async function yolo() {
         bail('Nothing to commit.');
     }
 
-    const message = await generate();
+    const message = await generate(YOLO_WORDS);
     console.log(`\n${c.orange(c.bold('Commit:'))}\n`);
     console.log(
         message
@@ -247,7 +283,7 @@ async function main() {
     if (cmd === 'yolo') {
         await yolo();
     } else if (cmd === 'push') {
-        push();
+        await animatedPush();
         console.log(c.orange('☄ pushed'));
     } else if (!cmd) {
         await interactive();
