@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { emitKeypressEvents } from 'node:readline';
 import {
     checkbox,
     confirm,
@@ -47,6 +48,20 @@ function banner() {
 function bail(msg) {
     console.error(c.red(msg));
     process.exit(1);
+}
+
+// Quit on Escape (in addition to Ctrl-C), like cancelling the commit.
+function enableEscapeToQuit() {
+    if (!process.stdin.isTTY) {
+        return;
+    }
+    emitKeypressEvents(process.stdin);
+    process.stdin.on('keypress', (_, key) => {
+        if (key?.name === 'escape') {
+            console.log(c.dim('\nAborted.'));
+            process.exit(0);
+        }
+    });
 }
 
 async function generate() {
@@ -154,6 +169,7 @@ async function interactive() {
 async function main() {
     selfUpdate();
     banner();
+    enableEscapeToQuit();
 
     if (!isRepo()) {
         bail('Not a git repository.');
