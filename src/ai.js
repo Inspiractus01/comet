@@ -54,39 +54,57 @@ function clean(message) {
         .trim();
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 export async function generateCommit(
     diff,
     { model = 'openai', conventional = true, short = false } = {},
 ) {
-    const res = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-            model,
-            private: true,
-            messages: [
-                {
-                    role: 'system',
-                    content: buildSystemPrompt({ conventional, short }),
-                },
-                {
-                    role: 'user',
-                    content: `Generate a commit message for this staged diff:\n\n${trimDiff(diff)}`,
-                },
-            ],
-        }),
+    const body = JSON.stringify({
+        model,
+        private: true,
+        referrer: 'comet-cli',
+        messages: [
+            {
+                role: 'system',
+                content: buildSystemPrompt({ conventional, short }),
+            },
+            {
+                role: 'user',
+                content: `Generate a commit message for this staged diff:\n\n${trimDiff(diff)}`,
+            },
+        ],
     });
 
-    if (!res.ok) {
-        throw new Error(`AI request failed (${res.status})`);
+    const attempts = 4;
+    let lastStatus = 0;
+
+    for (let i = 0; i < attempts; i++) {
+        const res = await fetch(ENDPOINT, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body,
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            const content = data?.choices?.[0]?.message?.content;
+            if (!content) {
+                throw new Error('AI returned an empty response');
+            }
+            return clean(content);
+        }
+
+        lastStatus = res.status;
+        if ((res.status === 429 || res.status >= 500) && i < attempts - 1) {
+            await sleep(2000 * (i + 1));
+            continue;
+        }
+        break;
     }
 
-    const data = await res.json();
-    const content = data?.choices?.[0]?.message?.content;
-
-    if (!content) {
-        throw new Error('AI returned an empty response');
+    if (lastStatus === 429) {
+        throw new Error('rate limited (429) — wait a moment and try again');
     }
-
-    return clean(content);
+    throw new Error(`AI request failed (${lastStatus})`);
 }
