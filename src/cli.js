@@ -237,10 +237,13 @@ async function main() {
 
     if (cmd === 'yolo') {
         await yolo();
+    } else if (cmd === 'push') {
+        push();
+        console.log(c.orange('☄ pushed'));
     } else if (!cmd) {
         await interactive();
     } else {
-        console.log('Usage: comet [yolo|config]');
+        console.log('Usage: comet [yolo|push|config]');
         process.exit(1);
     }
 }
