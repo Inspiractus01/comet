@@ -1,0 +1,19 @@
+{
+    "name": "comet",
+    "version": "0.1.0",
+    "description": "AI-powered git commit message generator. Free, no API key.",
+    "type": "module",
+    "bin": {
+        "comet": "src/cli.js"
+    },
+    "files": [
+        "src"
+    ],
+    "engines": {
+        "node": ">=18"
+    },
+    "dependencies": {
+        "@inquirer/prompts": "^7.2.1"
+    },
+    "license": "MIT"
+}

@@ -1,0 +1,78 @@
+// Free, keyless text generation via Pollinations (OpenAI-compatible endpoint).
+const ENDPOINT = 'https://text.pollinations.ai/openai';
+
+const SYSTEM_PROMPT = `You write git commit messages. Follow Conventional Commits.
+
+Rules:
+- Output ONLY the commit message. No code fences, no quotes, no explanations.
+- Subject line: "type(scope): summary", lowercase, max 72 chars, imperative mood.
+- type is one of: feat, fix, refactor, style, docs, test, chore, perf, build, ci.
+- scope is optional, derive it from the changed files when obvious.
+- If the change is non-trivial, add a blank line then 1-4 short "- " bullet points describing what changed and why.
+- Keep it concise and specific to the diff. Do not invent changes.`;
+
+// Lockfiles / generated noise we strip before sending the diff to the model.
+const NOISE = [
+    /package-lock\.json/,
+    /pnpm-lock\.yaml/,
+    /yarn\.lock/,
+    /\.min\.(js|css)/,
+    /\.(png|jpe?g|gif|webp|svg|ico|woff2?|ttf|eot|pdf)$/i,
+];
+
+const MAX_DIFF_CHARS = 8000;
+
+function trimDiff(diff) {
+    // Drop diff blocks for noisy files, then cap total size.
+    const blocks = diff.split(/(?=^diff --git )/m);
+    const kept = blocks.filter((b) => {
+        const header = b.split('\n')[0] || '';
+        return !NOISE.some((re) => re.test(header));
+    });
+
+    let result = kept.join('') || diff;
+    if (result.length > MAX_DIFF_CHARS) {
+        result = `${result.slice(0, MAX_DIFF_CHARS)}\n... [diff truncated]`;
+    }
+    return result;
+}
+
+function clean(message) {
+    // Strip accidental code fences / surrounding quotes the model may add.
+    return message
+        .replace(/^```[a-z]*\n?/i, '')
+        .replace(/\n?```$/i, '')
+        .replace(/^["'`]|["'`]$/g, '')
+        .trim();
+}
+
+export async function generateCommit(diff, { model = 'openai' } = {}) {
+    const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+            model,
+            private: true,
+            messages: [
+                { role: 'system', content: SYSTEM_PROMPT },
+                {
+                    role: 'user',
+                    content: `Generate a commit message for this staged diff:\n\n${trimDiff(diff)}`,
+                },
+            ],
+        }),
+    });
+
+    if (!res.ok) {
+        throw new Error(`AI request failed (${res.status})`);
+    }
+
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content;
+
+    if (!content) {
+        throw new Error('AI returned an empty response');
+    }
+
+    return clean(content);
+}
