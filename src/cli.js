@@ -72,7 +72,8 @@ function animatedPush() {
     return new Promise((resolve, reject) => {
         const stop = startSpinner({
             words: PUSH_WORDS,
-            tail: ['═', '═', '·'],
+            tail: ['=', '=', '-'],
+            head: '>',
             interval: 80,
         });
         let err = '';

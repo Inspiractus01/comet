@@ -40,24 +40,25 @@ function pick(words) {
     return words[Math.floor(Math.random() * words.length)];
 }
 
-function track(pos, width, tail) {
+function comet(pos, width, tail, head) {
     const cells = Array(width).fill(' ');
     for (let t = 0; t < tail.length; t++) {
         const p = pos - (t + 1);
-        if (p >= 0) {
+        if (p >= 0 && p < width) {
             cells[p] = `${DIM}${A}${tail[t]}${R}`;
         }
     }
-    if (pos < width) {
-        cells[pos] = `${O}\x1b[1m☄${R}`;
+    if (pos >= 0 && pos < width) {
+        cells[pos] = `${O}\x1b[1m${head}${R}`;
     }
     return cells.join('');
 }
 
 export function startSpinner({
     words,
-    tail = ['⋆', '·'],
-    width = 12,
+    tail = ['.', '.', '.'],
+    head = '*',
+    width = 16,
     interval = 110,
 } = {}) {
     if (!process.stdout.isTTY) {
@@ -67,19 +68,22 @@ export function startSpinner({
     const word = pick(words);
     let pos = 0;
     let tick = 0;
-    process.stdout.write('\x1b[?25l'); // hide cursor
+    process.stdout.write('\x1b[?25l');
 
     const id = setInterval(() => {
-        const dots = '.'.repeat(tick % 4);
-        process.stdout.write(
-            `\r\x1b[K  ${track(pos, width, tail)}  ${O}${word}${R}${DIM}${dots}${R}`,
-        );
+        const cols = process.stdout.columns || 80;
+        const dots = '.'.repeat(tick % 4).padEnd(3);
+        const left = `  ${O}${word}${R}${DIM}${dots}${R}`;
+        const leftLen = 2 + word.length + 3;
+        const anim = comet(pos, width, tail, head);
+        const pad = Math.max(2, cols - leftLen - width - 1);
+        process.stdout.write(`\r\x1b[K${left}${' '.repeat(pad)}${anim}`);
         pos = (pos + 1) % (width + tail.length);
         tick++;
     }, interval);
 
     return () => {
         clearInterval(id);
-        process.stdout.write('\r\x1b[K\x1b[?25h'); // clear line, show cursor
+        process.stdout.write('\r\x1b[K\x1b[?25h');
     };
 }
