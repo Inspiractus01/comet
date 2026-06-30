@@ -76,7 +76,7 @@ export async function generateCommit(
         ],
     });
 
-    const attempts = 4;
+    const attempts = 5;
     let lastStatus = 0;
 
     for (let i = 0; i < attempts; i++) {
@@ -85,18 +85,29 @@ export async function generateCommit(
             headers: { 'content-type': 'application/json' },
             body,
         });
+        lastStatus = res.status;
 
         if (res.ok) {
-            const data = await res.json();
-            const content = data?.choices?.[0]?.message?.content;
-            if (!content) {
-                throw new Error('AI returned an empty response');
+            const raw = (await res.text()).trim();
+            let content = raw;
+            try {
+                const data = JSON.parse(raw);
+                content =
+                    data?.choices?.[0]?.message?.content ??
+                    data?.choices?.[0]?.text ??
+                    '';
+            } catch {
+                content = raw;
             }
-            return clean(content);
+            content = clean(content);
+            if (content) {
+                return content;
+            }
         }
 
-        lastStatus = res.status;
-        if ((res.status === 429 || res.status >= 500) && i < attempts - 1) {
+        const retryable = !res.ok && (res.status === 429 || res.status >= 500);
+        const emptyOk = res.ok;
+        if ((retryable || emptyOk) && i < attempts - 1) {
             await sleep(2000 * (i + 1));
             continue;
         }
@@ -106,5 +117,9 @@ export async function generateCommit(
     if (lastStatus === 429) {
         throw new Error('rate limited (429) — wait a moment and try again');
     }
-    throw new Error(`AI request failed (${lastStatus})`);
+    throw new Error(
+        lastStatus === 200
+            ? 'AI returned an empty response — try again'
+            : `AI request failed (${lastStatus})`,
+    );
 }
