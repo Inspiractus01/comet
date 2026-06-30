@@ -179,7 +179,19 @@ async function yolo() {
     if (stagedFileNames().length === 0) {
         bail('Nothing to commit.');
     }
-    await confirmAndCommit(await generate());
+
+    const message = await generate();
+    console.log(`\n${c.orange(c.bold('Commit:'))}\n`);
+    console.log(
+        message
+            .split('\n')
+            .map((l) => `  ${A}${l}${R}`)
+            .join('\n'),
+    );
+    console.log('');
+
+    commit(message);
+    console.log(c.orange('☄ committed'));
 }
 
 async function interactive() {
