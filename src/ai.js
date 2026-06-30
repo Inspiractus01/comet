@@ -2,20 +2,27 @@
 const ENDPOINT = 'https://text.pollinations.ai/openai';
 
 function buildSystemPrompt({ conventional, short }) {
+    if (short) {
+        return `You write git commit messages.
+
+Rules:
+- Output ONLY a single Conventional Commits subject line: "type(scope): summary".
+- type one of feat, fix, refactor, style, docs, test, chore, perf, build, ci; scope optional, derived from changed files.
+- Lowercase, imperative mood, as short as possible (aim for under 50 chars).
+- No body, no bullets, no quotes, no code fences, no explanations.
+- Be specific to the diff. Do not invent changes.`;
+    }
+
     const subject = conventional
         ? 'Subject line: "type(scope): summary" (type one of feat, fix, refactor, style, docs, test, chore, perf, build, ci; scope optional, derived from changed files), lowercase, imperative mood, max 72 chars.'
         : 'Subject line: one concise summary in imperative mood, max 72 chars.';
-
-    const body = short
-        ? '- Output ONLY the subject line. No body, no bullets.'
-        : '- If the change is non-trivial, add a blank line then 1-4 short "- " bullet points describing what changed and why.';
 
     return `You write git commit messages.
 
 Rules:
 - Output ONLY the commit message. No code fences, no quotes, no explanations.
 - ${subject}
-${body}
+- If the change is non-trivial, add a blank line then 1-4 short "- " bullet points describing what changed and why.
 - Keep it specific to the diff. Do not invent changes.`;
 }
 
@@ -60,21 +67,13 @@ export async function generateCommit(
     diff,
     { model = 'openai', conventional = true, short = false } = {},
 ) {
-    const body = JSON.stringify({
-        model,
-        private: true,
-        referrer: 'comet-cli',
-        messages: [
-            {
-                role: 'system',
-                content: buildSystemPrompt({ conventional, short }),
-            },
-            {
-                role: 'user',
-                content: `Generate a commit message for this staged diff:\n\n${trimDiff(diff)}`,
-            },
-        ],
-    });
+    const messages = [
+        { role: 'system', content: buildSystemPrompt({ conventional, short }) },
+        {
+            role: 'user',
+            content: `Generate a commit message for this staged diff:\n\n${trimDiff(diff)}`,
+        },
+    ];
 
     const attempts = 5;
     let lastStatus = 0;
@@ -83,7 +82,13 @@ export async function generateCommit(
         const res = await fetch(ENDPOINT, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body,
+            body: JSON.stringify({
+                model,
+                private: true,
+                referrer: 'comet-cli',
+                seed: Math.floor(Math.random() * 1e9),
+                messages,
+            }),
         });
         lastStatus = res.status;
 
