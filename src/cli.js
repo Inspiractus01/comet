@@ -23,7 +23,13 @@ import { selfUpdate } from './update.js';
 
 let cfg = loadConfig();
 
-const IGNORED = new Set(['CLAUDE.md']);
+const IGNORED = new Set([
+    'CLAUDE.md',
+    'CLAUDE.local.md',
+    'AGENTS.md',
+    'GEMINI.md',
+    '.cursorrules',
+]);
 const isIgnored = (p) => cfg.ignoreClaudeMd && IGNORED.has(p.split('/').pop());
 
 const O = '\x1b[38;5;208m'; // orange
@@ -147,7 +153,10 @@ async function confirmAndCommit(initialMessage) {
 
 async function runConfig() {
     const items = [
-        { key: 'ignoreClaudeMd', name: 'Ignore CLAUDE.md when staging' },
+        {
+            key: 'ignoreClaudeMd',
+            name: 'Ignore agent files (CLAUDE.md, AGENTS.md, …) when staging',
+        },
         { key: 'askForPush', name: 'Ask to push after commit' },
         { key: 'conventionalCommits', name: 'Conventional Commits style' },
         { key: 'short', name: 'Short messages (subject line only)' },

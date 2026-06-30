@@ -39,7 +39,7 @@ comet config  # settings
 
 | Setting | Default | Does |
 |---|---|---|
-| Ignore CLAUDE.md | on | skips `CLAUDE.md` when staging |
+| Ignore agent files | on | skips `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules` when staging |
 | Ask to push | off | asks to push after commit |
 | Conventional Commits | on | `type(scope): summary` style |
 | Short messages | off | subject line only, no bullets |
