@@ -4,7 +4,7 @@
 
 # comet ☄️
 
-> *because "fix stuff" isn't a commit message* ☄️
+> *because "fix stuff" isn't a commit message*
 
 A small CLI that writes your git commit messages. Free, no API key.
 
