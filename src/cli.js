@@ -245,10 +245,12 @@ async function main() {
     }
 }
 
-main().catch((err) => {
-    if (err?.name === 'ExitPromptError') {
-        console.log(c.dim('\nAborted.'));
-        process.exit(0);
-    }
-    bail(err.message);
-});
+main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+        if (err?.name === 'ExitPromptError') {
+            console.log(c.dim('\nAborted.'));
+            process.exit(0);
+        }
+        bail(err.message);
+    });
