@@ -196,6 +196,7 @@ async function runConfig() {
         { key: 'askForPush', name: 'Ask to push after commit' },
         { key: 'conventionalCommits', name: 'Conventional Commits style' },
         { key: 'short', name: 'Short messages (subject line only)' },
+        { key: 'ultraYolo', name: 'Ultra yolo — yolo mode pushes immediately, no prompt' },
     ];
 
     const enabled = await checkbox({
@@ -237,6 +238,11 @@ async function yolo() {
 
     commit(message);
     console.log(c.orange('☄ committed'));
+
+    if (cfg.ultraYolo) {
+        await animatedPush();
+        console.log(c.orange('☄ pushed'));
+    }
 }
 
 async function interactive() {

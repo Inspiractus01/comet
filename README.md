@@ -43,6 +43,7 @@ comet config  # settings
 | Ask to push | off | asks to push after commit |
 | Conventional Commits | on | `type(scope): summary` style |
 | Short messages | off | subject line only, no bullets |
+| Ultra yolo | off | `comet yolo` pushes immediately after commit, no prompt |
 
 ## Notes
 

@@ -10,6 +10,7 @@ export const defaults = {
     askForPush: false, // false = manual push, true = ask after commit
     conventionalCommits: true, // Conventional Commits style
     short: false, // short: subject line only, no body bullets
+    ultraYolo: false, // yolo mode pushes immediately after commit, no prompt
 };
 
 export function loadConfig() {
