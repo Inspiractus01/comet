@@ -121,6 +121,9 @@ async function generate(words = GENERATE_WORDS) {
         const msg = await generateCommit(diff, {
             conventional: cfg.conventionalCommits,
             short: cfg.short,
+            provider: cfg.provider,
+            claudeModel: cfg.claudeModel || undefined,
+            token: cfg.pollinationsToken,
         });
         stop();
         return msg;
@@ -199,21 +202,33 @@ async function runConfig() {
         { key: 'ultraYolo', name: 'Ultra yolo — yolo mode pushes immediately, no prompt' },
     ];
 
+    // Provider is a string, not a flag, so it gets its own checkbox mapping.
+    const CLAUDE_PROVIDER = 'useClaudeCli';
+
     const enabled = await checkbox({
         message: 'Settings — space to toggle, enter to save',
-        choices: items.map((i) => ({
-            name: i.name,
-            value: i.key,
-            checked: cfg[i.key],
-        })),
+        choices: [
+            ...items.map((i) => ({
+                name: i.name,
+                value: i.key,
+                checked: cfg[i.key],
+            })),
+            {
+                name: 'Use local Claude Code CLI (off = Pollinations, needs a token)',
+                value: CLAUDE_PROVIDER,
+                checked: cfg.provider !== 'pollinations',
+            },
+        ],
         loop: false,
         theme,
     });
 
-    const next = { ...defaults };
+    // Keep non-toggle settings (token, model) — this screen owns the rest.
+    const next = { ...defaults, ...cfg };
     for (const i of items) {
         next[i.key] = enabled.includes(i.key);
     }
+    next.provider = enabled.includes(CLAUDE_PROVIDER) ? 'claude' : 'pollinations';
     saveConfig(next);
     cfg = next;
     console.log(c.orange('☄ settings saved'));

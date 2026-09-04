@@ -11,6 +11,9 @@ export const defaults = {
     conventionalCommits: true, // Conventional Commits style
     short: false, // short: subject line only, no body bullets
     ultraYolo: false, // yolo mode pushes immediately after commit, no prompt
+    provider: 'claude', // 'claude' = local Claude Code CLI, 'pollinations' = keyless HTTP
+    claudeModel: '', // empty = haiku; any model alias the claude CLI accepts
+    pollinationsToken: '', // optional enter.pollinations.ai token, own pollen budget
 };
 
 export function loadConfig() {

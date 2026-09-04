@@ -1,4 +1,8 @@
-// Free, keyless text generation via Pollinations (OpenAI-compatible endpoint).
+import { generateWithClaude } from './claude.js';
+
+// Fallback provider: free, keyless generation via Pollinations
+// (OpenAI-compatible endpoint). Its anonymous tier can no longer pay for
+// diff-sized requests, so "claude" is the default provider.
 const ENDPOINT = 'https://text.pollinations.ai/openai';
 
 function buildSystemPrompt({ conventional, short }) {
@@ -63,10 +67,27 @@ function clean(message) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export async function generateCommit(
+export async function generateCommit(diff, options = {}) {
+    const { provider = 'claude', conventional = true, short = false } = options;
+
+    if (provider === 'claude') {
+        const message = await generateWithClaude(
+            buildSystemPrompt({ conventional, short }),
+            `Generate a commit message for this staged diff:\n\n${trimDiff(diff)}`,
+            { model: options.claudeModel },
+        );
+        return clean(message);
+    }
+
+    return generateViaPollinations(diff, options);
+}
+
+async function generateViaPollinations(
     diff,
-    { model = 'openai', conventional = true, short = false } = {},
+    { model = 'openai', conventional = true, short = false, token } = {},
 ) {
+    const apiToken = token || process.env.POLLINATIONS_TOKEN;
+
     const messages = [
         { role: 'system', content: buildSystemPrompt({ conventional, short }) },
         {
@@ -81,7 +102,10 @@ export async function generateCommit(
     for (let i = 0; i < attempts; i++) {
         const res = await fetch(ENDPOINT, {
             method: 'POST',
-            headers: { 'content-type': 'application/json' },
+            headers: {
+                'content-type': 'application/json',
+                ...(apiToken ? { authorization: `Bearer ${apiToken}` } : {}),
+            },
             body: JSON.stringify({
                 model,
                 private: true,
@@ -110,6 +134,8 @@ export async function generateCommit(
             }
         }
 
+        // 402 means the key cannot pay for a diff-sized request; retrying it
+        // just burns time, since the cost is the same every attempt.
         const retryable = !res.ok && (res.status === 429 || res.status >= 500);
         const emptyOk = res.ok;
         if ((retryable || emptyOk) && i < attempts - 1) {
@@ -121,6 +147,13 @@ export async function generateCommit(
 
     if (lastStatus === 429) {
         throw new Error('rate limited (429) — wait a moment and try again');
+    }
+    if (lastStatus === 402) {
+        throw new Error(
+            apiToken
+                ? 'token is out of pollen (402) — top up at enter.pollinations.ai'
+                : 'anonymous tier cannot pay for a diff-sized request (402) — get a token at enter.pollinations.ai, then set POLLINATIONS_TOKEN or "pollinationsToken" in ~/.config/comet/config.json',
+        );
     }
     throw new Error(
         lastStatus === 200
