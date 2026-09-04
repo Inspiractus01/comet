@@ -27,6 +27,15 @@ export const YOLO_WORDS = [
     'Blazing',
 ];
 
+export const SQUASH_WORDS = [
+    'Compacting',
+    'Collapsing',
+    'Condensing',
+    'Folding',
+    'Flattening',
+    'Crushing',
+];
+
 export const PUSH_WORDS = [
     'Launching',
     'Hurtling',

@@ -79,3 +79,53 @@ export function commit(message) {
 export function push() {
     git(['push'], { stdio: 'inherit' });
 }
+
+export function currentBranch() {
+    return git(['rev-parse', '--abbrev-ref', 'HEAD']).trim();
+}
+
+// Ref this branch is published at: its upstream, or a same-named remote
+// branch when nothing is tracked yet. null when the branch is local-only.
+export function upstreamRef() {
+    try {
+        return git(
+            ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
+            { stdio: 'pipe' },
+        ).trim();
+    } catch {
+        // no upstream configured — fall through
+    }
+
+    try {
+        const remote = `origin/${currentBranch()}`;
+        git(['rev-parse', '--verify', '--quiet', remote], { stdio: 'pipe' });
+        return remote;
+    } catch {
+        return null;
+    }
+}
+
+// Commits on HEAD the remote does not have yet, oldest first.
+export function unpushedCommits(base) {
+    return git(['log', '--reverse', '--format=%h%x00%s', `${base}..HEAD`])
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+            const [hash, subject] = line.split('\0');
+            return { hash, subject };
+        });
+}
+
+// Combined diff of everything those commits changed.
+export function rangeDiff(base) {
+    return git(['diff', '--no-color', `${base}..HEAD`]);
+}
+
+export function headSha() {
+    return git(['rev-parse', 'HEAD']).trim();
+}
+
+// Moves the branch back to ref, keeping every change staged.
+export function softReset(ref) {
+    git(['reset', '--soft', ref]);
+}

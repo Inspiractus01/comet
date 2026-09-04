@@ -29,11 +29,38 @@ Needs `node` (≥18) and `git`. If `comet` isn't found afterwards, add `~/.local
 ```bash
 comet         # pick files, review the message, commit
 comet yolo    # stage everything and commit
+comet squash  # squash every unpushed commit into one, with a fresh message
 comet push    # git push
 comet config  # settings
 ```
 
 `Esc` or `Ctrl-C` quits anytime.
+
+## Squash
+
+`comet squash` takes every commit the remote does not have yet, reads their combined
+diff, and rewrites them into one commit with a freshly generated message — so a pile
+of `wip` commits lands as if you had written it in one go.
+
+```
+☄ c o m e t
+
+3 unpushed commits (ahead of origin/main):
+
+  de4f30c  wip: b
+  8856bc1  wip: c
+  d4dd696  wip: a again
+
+Proposed squash of 3 commits:
+
+  feat(cli): add file picker and message editor
+```
+
+Commit, regenerate, edit, or cancel — same as a normal run. It refuses to touch
+anything already pushed, and prints the old head so `git reset --hard <sha>` undoes it.
+
+Needs an upstream (or an `origin/<branch>`) to know what is already pushed. Staged
+changes must be committed or unstaged first, so they do not get folded in by accident.
 
 ## Settings (`comet config`)
 

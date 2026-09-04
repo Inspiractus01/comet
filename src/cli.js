@@ -12,16 +12,22 @@ import { defaults, loadConfig, saveConfig } from './config.js';
 import {
     changedFiles,
     commit,
+    headSha,
     isRepo,
+    rangeDiff,
+    softReset,
     stageAll,
     stagedDiff,
     stagedFileNames,
     stageOnly,
+    unpushedCommits,
     unstage,
+    upstreamRef,
 } from './git.js';
 import {
     GENERATE_WORDS,
     PUSH_WORDS,
+    SQUASH_WORDS,
     startSpinner,
     YOLO_WORDS,
 } from './spinner.js';
@@ -111,8 +117,18 @@ function enableEscapeToQuit() {
     });
 }
 
-async function generate(words = GENERATE_WORDS) {
-    const diff = stagedDiff();
+function printMessage(title, message) {
+    console.log(`\n${c.orange(c.bold(title))}\n`);
+    console.log(
+        message
+            .split('\n')
+            .map((l) => `  ${A}${l}${R}`)
+            .join('\n'),
+    );
+    console.log('');
+}
+
+async function generate(words = GENERATE_WORDS, diff = stagedDiff()) {
     if (!diff.trim()) {
         bail('Nothing staged.');
     }
@@ -133,18 +149,18 @@ async function generate(words = GENERATE_WORDS) {
     }
 }
 
-async function confirmAndCommit(initialMessage) {
+async function confirmAndCommit(initialMessage, options = {}) {
+    const {
+        diff,
+        title = 'Proposed commit:',
+        cancelNote = 'Cancelled. Changes stay staged.',
+        doneNote = '☄ committed',
+        beforeCommit,
+    } = options;
     let message = initialMessage;
 
     while (true) {
-        console.log(`\n${c.orange(c.bold('Proposed commit:'))}\n`);
-        console.log(
-            message
-                .split('\n')
-                .map((l) => `  ${A}${l}${R}`)
-                .join('\n'),
-        );
-        console.log('');
+        printMessage(title, message);
 
         const action = await select({
             message: 'What now?',
@@ -158,11 +174,11 @@ async function confirmAndCommit(initialMessage) {
         });
 
         if (action === 'cancel') {
-            console.log(c.dim('Cancelled. Changes stay staged.'));
+            console.log(c.dim(cancelNote));
             return;
         }
         if (action === 'regen') {
-            message = await generate();
+            message = await generate(GENERATE_WORDS, diff);
             continue;
         }
         if (action === 'edit') {
@@ -176,8 +192,9 @@ async function confirmAndCommit(initialMessage) {
             continue;
         }
 
+        beforeCommit?.();
         commit(message);
-        console.log(c.orange('☄ committed'));
+        console.log(c.orange(doneNote));
 
         if (
             cfg.askForPush &&
@@ -242,14 +259,7 @@ async function yolo() {
     }
 
     const message = await generate(YOLO_WORDS);
-    console.log(`\n${c.orange(c.bold('Commit:'))}\n`);
-    console.log(
-        message
-            .split('\n')
-            .map((l) => `  ${A}${l}${R}`)
-            .join('\n'),
-    );
-    console.log('');
+    printMessage('Commit:', message);
 
     commit(message);
     console.log(c.orange('☄ committed'));
@@ -258,6 +268,53 @@ async function yolo() {
         await animatedPush();
         console.log(c.orange('☄ pushed'));
     }
+}
+
+// Rewrites every commit that is not on the remote yet into a single commit,
+// with a freshly generated message for the combined diff.
+async function squash() {
+    const base = upstreamRef();
+    if (!base) {
+        bail('No remote branch to compare against — push this branch once, then squash.');
+    }
+    if (stagedFileNames().length > 0) {
+        bail('You have staged changes — commit or unstage them before squashing.');
+    }
+
+    const commits = unpushedCommits(base);
+    if (commits.length === 0) {
+        bail(`Nothing to squash — no commits ahead of ${base}.`);
+    }
+    if (commits.length === 1) {
+        bail('Only one unpushed commit — nothing to squash.');
+    }
+
+    console.log(
+        `${c.orange(c.bold(`${commits.length} unpushed commits (ahead of ${base}):`))}\n`,
+    );
+    for (const { hash, subject } of commits) {
+        console.log(`  ${c.dim(hash)}  ${subject}`);
+    }
+
+    const diff = rangeDiff(base);
+    if (!diff.trim()) {
+        bail('Those commits cancel each other out — nothing to squash.');
+    }
+
+    const oldHead = headSha();
+
+    await confirmAndCommit(await generate(SQUASH_WORDS, diff), {
+        diff,
+        title: `Proposed squash of ${commits.length} commits:`,
+        cancelNote: 'Cancelled. History untouched.',
+        doneNote: `☄ squashed ${commits.length} commits into one`,
+        beforeCommit: () => {
+            console.log(
+                c.dim(`  old head ${oldHead.slice(0, 10)} — "git reset --hard ${oldHead.slice(0, 10)}" undoes this`),
+            );
+            softReset(base);
+        },
+    });
 }
 
 async function interactive() {
@@ -303,13 +360,15 @@ async function main() {
 
     if (cmd === 'yolo') {
         await yolo();
+    } else if (cmd === 'squash') {
+        await squash();
     } else if (cmd === 'push') {
         await animatedPush();
         console.log(c.orange('☄ pushed'));
     } else if (!cmd) {
         await interactive();
     } else {
-        console.log('Usage: comet [yolo|push|config]');
+        console.log('Usage: comet [yolo|squash|push|config]');
         process.exit(1);
     }
 }
